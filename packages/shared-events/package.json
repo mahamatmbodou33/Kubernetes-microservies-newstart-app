@@ -1,0 +1,18 @@
+{
+  "name": "@newstart/shared-events",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable event model and messaging interfaces (MessagePublisher/MessageConsumer/NotificationProvider) with a local HTTP implementation.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@newstart/shared-utils": "0.1.0",
+    "uuid": "^11.0.2"
+  }
+}

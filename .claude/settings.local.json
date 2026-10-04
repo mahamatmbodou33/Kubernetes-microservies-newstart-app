@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(docker --version)",
+      "Bash(git --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npm audit *)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(npm view *)",
+      "Bash(npm ls *)",
+      "Bash(rm -f package-lock.json)",
+      "Bash(rm -rf node_modules/glob)",
+      "Bash(npm test *)",
+      "Bash(echo \"LINT_EXIT:$?\")",
+      "Bash(rm -rf frontend/node_modules/esbuild node_modules/esbuild)",
+      "Bash(rm -rf frontend/node_modules node_modules/esbuild node_modules/vite)",
+      "Bash(docker compose *)",
+      "Bash(docker build *)",
+      "Bash(docker info *)",
+      "Bash(docker context *)",
+      "Bash(docker run *)",
+      "Bash(docker rmi *)",
+      "Bash(echo \"lint exit $?\")"
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+# Production-quality multi-stage build for a NewStart backend service.
+# Parameterized by build args so all four services share one Dockerfile.
+#   docker build -f Dockerfile.service --build-arg SERVICE=user-service --build-arg SERVICE_PORT=3000 .
+# Build context MUST be the repository root (the monorepo uses npm workspaces).
+
+ARG NODE_VERSION=22
+
+# ---------- build stage ----------
+FROM node:${NODE_VERSION}-alpine AS build
+WORKDIR /app
+
+# Install dependencies first (cached until any package.json or the lockfile changes).
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/shared-utils/package.json packages/shared-utils/
+COPY packages/shared-events/package.json packages/shared-events/
+COPY services/user-service/package.json services/user-service/
+COPY services/opportunity-service/package.json services/opportunity-service/
+COPY services/checklist-service/package.json services/checklist-service/
+COPY services/notification-service/package.json services/notification-service/
+COPY gateway/package.json gateway/
+COPY frontend/package.json frontend/
+RUN npm ci
+
+# Copy sources and build the shared packages + the target service.
+COPY packages ./packages
+COPY services ./services
+ARG SERVICE
+RUN npm run build --workspace=packages/shared-types \
+ && npm run build --workspace=packages/shared-utils \
+ && npm run build --workspace=packages/shared-events \
+ && npm run build --workspace=services/${SERVICE}
+
+# Drop dev dependencies so only production deps remain for the runtime image.
+RUN npm prune --omit=dev
+
+# ---------- runtime stage ----------
+FROM node:${NODE_VERSION}-alpine AS runtime
+# tini is PID 1 for correct signal forwarding (SIGTERM) and zombie reaping.
+RUN apk add --no-cache tini
+ENV NODE_ENV=production
+WORKDIR /app
+
+ARG SERVICE
+# Pruned dependency tree + built shared packages (resolved via workspace symlinks).
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages ./packages
+# The service's compiled output, migrations and canonical schema.
+COPY --from=build /app/services/${SERVICE}/dist ./services/${SERVICE}/dist
+COPY --from=build /app/services/${SERVICE}/migrations ./services/${SERVICE}/migrations
+COPY --from=build /app/services/${SERVICE}/src/db ./services/${SERVICE}/src/db
+COPY --from=build /app/services/${SERVICE}/package.json ./services/${SERVICE}/package.json
+
+# Run as the built-in non-root user.
+USER node
+WORKDIR /app/services/${SERVICE}
+
+ARG SERVICE_PORT=3000
+ENV PORT=${SERVICE_PORT}
+EXPOSE ${SERVICE_PORT}
+
+ENTRYPOINT ["/sbin/tini", "--"]
+# Apply migrations (idempotent), then start the server as PID's child so it gets SIGTERM.
+# NOTE: for Kubernetes, run migrations in an init container/Job instead of per replica.
+CMD ["sh", "-c", "/app/node_modules/.bin/node-pg-migrate up && exec node dist/index.js"]

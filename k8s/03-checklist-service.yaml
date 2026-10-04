@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checklist-service
+  namespace: newstart
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: checklist-service}
+  template:
+    metadata:
+      labels: {app: checklist-service}
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done"]
+      containers:
+        - name: checklist-service
+          image: newstart/checklist-service:local
+          imagePullPolicy: Never
+          ports: [{containerPort: 3002}]
+          envFrom:
+            - configMapRef: {name: newstart-config}
+          resources:
+            requests: {memory: 256Mi, cpu: 100m}
+            limits: {memory: 512Mi, cpu: 500m}
+          env:
+            - {name: PORT, value: "3002"}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: newstart-db-urls, key: CHECKLIST_DATABASE_URL}
+          readinessProbe:
+            httpGet: {path: /health, port: 3002}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health, port: 3002}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checklist-service
+  namespace: newstart
+spec:
+  selector: {app: checklist-service}
+  ports: [{port: 3002, targetPort: 3002}]
