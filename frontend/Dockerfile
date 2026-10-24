@@ -31,9 +31,9 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build --workspace=frontend
 
 # ---------- runtime stage ----------
-FROM nginx:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080
 # nginx handles SIGTERM/SIGQUIT for graceful shutdown by default.
 CMD ["nginx", "-g", "daemon off;"]
