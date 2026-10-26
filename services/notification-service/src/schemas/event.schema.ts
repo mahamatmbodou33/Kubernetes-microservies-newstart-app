@@ -4,7 +4,7 @@ import { EVENT_SOURCES, EVENT_TYPES } from '@newstart/shared-events';
 
 /** Validates the incoming event envelope at the ingest boundary. */
 export const eventSchema = z.object({
-  eventId: z.string().uuid(),
+  eventId: z.guid(),
   eventType: z.enum(EVENT_TYPES),
   timestamp: z.string().datetime(),
   source: z.enum(EVENT_SOURCES),
@@ -12,7 +12,7 @@ export const eventSchema = z.object({
 });
 
 export const userIdParamSchema = z.object({
-  userId: z.string().uuid('User id must be a valid UUID'),
+  userId: z.guid('User id must be a valid UUID'),
 });
 
 export const listNotificationsQuerySchema = z.object({

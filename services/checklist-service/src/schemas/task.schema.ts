@@ -10,7 +10,7 @@ export const prioritySchema = z.enum(TASK_PRIORITIES);
 const dueDateSchema = z.string().date('dueDate must be a valid YYYY-MM-DD date');
 
 export const createChecklistSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.guid(),
   includeDefaults: z.boolean().optional().default(false),
 });
 
@@ -38,11 +38,11 @@ export const updateTaskSchema = z
   });
 
 export const userIdParamSchema = z.object({
-  userId: z.string().uuid('User id must be a valid UUID'),
+  userId: z.guid('User id must be a valid UUID'),
 });
 
 export const taskIdParamSchema = z.object({
-  taskId: z.string().uuid('Task id must be a valid UUID'),
+  taskId: z.guid('Task id must be a valid UUID'),
 });
 
 const SORT_FIELDS = ['createdAt', 'dueDate', 'priority', 'status', 'title'] as const;

@@ -54,7 +54,7 @@ export const updateSkillsSchema = z.object({
 });
 
 export const userIdParamSchema = z.object({
-  id: z.string().uuid('User id must be a valid UUID'),
+  id: z.guid('User id must be a valid UUID'),
 });
 
 export type CreateUserBody = z.infer<typeof createUserSchema>;

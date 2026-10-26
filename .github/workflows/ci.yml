@@ -1,0 +1,156 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  ECR_PREFIX: k8s-portfolio
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Code quality: lint, types, unit + integration tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build:packages
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  # ---------------------------------------------------------------------------
+  # 2. One job per image: lint Dockerfile, build, scan, (main only) push
+  # ---------------------------------------------------------------------------
+  build:
+    name: image · ${{ matrix.service }}
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write          # allows requesting the OIDC token for AWS
+    strategy:
+      fail-fast: false 
+      matrix:
+        include:
+          - service: user-service
+            dockerfile: Dockerfile.service
+            build-args: |
+              SERVICE=user-service
+              SERVICE_PORT=3000
+          - service: opportunity-service
+            dockerfile: Dockerfile.service
+            build-args: |
+              SERVICE=opportunity-service
+              SERVICE_PORT=3001
+          - service: checklist-service
+            dockerfile: Dockerfile.service
+            build-args: |
+              SERVICE=checklist-service
+              SERVICE_PORT=3002
+          - service: notification-service
+            dockerfile: Dockerfile.service
+            build-args: |
+              SERVICE=notification-service
+              SERVICE_PORT=3003
+          - service: api-gateway
+            dockerfile: gateway/Dockerfile
+            build-args: ""
+          - service: frontend
+            dockerfile: frontend/Dockerfile
+            build-args: |
+              VITE_API_BASE_URL=
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+          failure-threshold: error
+
+      - name: Image tag = short git SHA
+        id: meta
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build (load locally for scanning)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          platforms: linux/amd64
+          load: true
+          tags: ${{ matrix.service }}:scan
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Scan for vulnerabilities (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      # ----- everything below runs only on main, never on pull requests -----
+      - name: AWS credentials via OIDC
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Skip if this tag already exists (ECR tags are immutable)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        id: exists
+        run: |
+          if aws ecr describe-images \
+               --repository-name "$ECR_PREFIX/${{ matrix.service }}" \
+               --image-ids imageTag="${{ steps.meta.outputs.tag }}" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to ECR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.exists.outputs.found == 'false'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          build-args: ${{ matrix.build-args }}
+          platforms: linux/amd64
+          push: true
+          provenance: true
+          sbom: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_PREFIX }}/${{ matrix.service }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=${{ matrix.service }}

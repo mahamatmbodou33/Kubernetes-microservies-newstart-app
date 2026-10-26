@@ -18,11 +18,8 @@ COPY services/checklist-service/package.json services/checklist-service/
 COPY services/notification-service/package.json services/notification-service/
 COPY gateway/package.json gateway/
 COPY frontend/package.json frontend/
-# Vite 8 / Rolldown pulls platform-specific native bindings via optional dependencies.
-# A lockfile generated on another OS omits the linux-musl binary (npm/cli#4828), and
-# even `npm ci`/`install` won't add it. Removing the lockfile forces a fresh resolve
-# that fetches the correct platform binding. (Build-time only; runtime is static nginx.)
-RUN npm install -g npm@latest && rm -f package-lock.json && npm install --no-audit --no-fund
+
+RUN npm ci --no-audit --no-fund
 
 COPY frontend ./frontend
 # The API base URL is baked in at build time (the browser calls it directly).
@@ -31,7 +28,13 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 RUN npm run build --workspace=frontend
 
 # ---------- runtime stage ----------
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:stable-alpine AS runtime
+# Image runs as non-root (uid 101): switch to root only to patch/trim OS packages
+USER root
+# Apply Alpine security fixes; remove curl (nginx doesn't need it at runtime)
+RUN apk upgrade --no-cache \
+ && apk del --no-cache curl
+USER 101
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 8080

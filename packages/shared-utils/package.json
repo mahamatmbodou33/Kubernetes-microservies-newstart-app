@@ -5,7 +5,9 @@
   "description": "Cross-cutting infrastructure: logging, errors, middleware, config, HTTP client, graceful shutdown.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -16,7 +18,7 @@
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
     "uuid": "^11.0.2",
-    "zod": "^3.23.8"
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "express": "^4.21.1"
