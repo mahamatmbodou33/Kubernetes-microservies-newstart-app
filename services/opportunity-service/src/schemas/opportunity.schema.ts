@@ -36,11 +36,11 @@ export const createOpportunitySchema = z.object({
 export const updateOpportunitySchema = createOpportunitySchema.partial();
 
 export const opportunityIdParamSchema = z.object({
-  id: z.string().uuid('Opportunity id must be a valid UUID'),
+  id: z.guid('Opportunity id must be a valid UUID'),
 });
 
 export const userIdParamSchema = z.object({
-  userId: z.string().uuid('User id must be a valid UUID'),
+  userId: z.guid('User id must be a valid UUID'),
 });
 
 /** List/filter query params. `page`/`limit` are coerced from strings and bounded. */
@@ -66,12 +66,12 @@ export const pageQuerySchema = z.object({
 });
 
 export const saveOpportunityBodySchema = z.object({
-  userId: z.string().uuid('userId must be a valid UUID'),
+  userId: z.guid('userId must be a valid UUID'),
 });
 
 export const savedParamsSchema = z.object({
-  id: z.string().uuid('Opportunity id must be a valid UUID'),
-  userId: z.string().uuid('User id must be a valid UUID'),
+  id: z.guid('Opportunity id must be a valid UUID'),
+  userId: z.guid('User id must be a valid UUID'),
 });
 
 export type CreateOpportunityBody = z.infer<typeof createOpportunitySchema>;
