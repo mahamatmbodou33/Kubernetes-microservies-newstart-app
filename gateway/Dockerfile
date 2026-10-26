@@ -28,8 +28,13 @@ RUN npm run build --workspace=packages/shared-types \
 RUN npm prune --omit=dev
 
 # ---------- runtime stage ----------
+# ---------- runtime stage ----------
 FROM node:${NODE_VERSION}-alpine AS runtime
-RUN apk add --no-cache tini
+# tini as PID 1; then remove package managers the gateway never uses at runtime
+RUN apk add --no-cache tini \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+           /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 ENV NODE_ENV=production
 WORKDIR /app
 
