@@ -18,11 +18,8 @@ COPY services/checklist-service/package.json services/checklist-service/
 COPY services/notification-service/package.json services/notification-service/
 COPY gateway/package.json gateway/
 COPY frontend/package.json frontend/
-# Vite 8 / Rolldown pulls platform-specific native bindings via optional dependencies.
-# A lockfile generated on another OS omits the linux-musl binary (npm/cli#4828), and
-# even `npm ci`/`install` won't add it. Removing the lockfile forces a fresh resolve
-# that fetches the correct platform binding. (Build-time only; runtime is static nginx.)
-RUN npm install -g npm@latest && rm -f package-lock.json && npm install --no-audit --no-fund
+
+RUN npm ci --no-audit --no-fund
 
 COPY frontend ./frontend
 # The API base URL is baked in at build time (the browser calls it directly).
