@@ -29,6 +29,12 @@ RUN npm run build --workspace=frontend
 
 # ---------- runtime stage ----------
 FROM nginxinc/nginx-unprivileged:stable-alpine AS runtime
+# Image runs as non-root (uid 101): switch to root only to patch/trim OS packages
+USER root
+# Apply Alpine security fixes; remove curl (nginx doesn't need it at runtime)
+RUN apk upgrade --no-cache \
+ && apk del --no-cache curl
+USER 101
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 8080
